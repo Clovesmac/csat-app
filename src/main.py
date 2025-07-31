@@ -7,6 +7,7 @@ from flask import Flask, send_from_directory
 from flask_cors import CORS
 from src.models.csat import db, CSATResponse, get_database_url
 from src.routes.csat import csat_bp
+from src.routes.admin import admin_bp
 
 app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
 app.config['SECRET_KEY'] = 'asdf#FGSgvasgf$5$WGT'
@@ -16,6 +17,7 @@ CORS(app)
 
 # Registrar blueprints
 app.register_blueprint(csat_bp, url_prefix='/api')
+app.register_blueprint(admin_bp)
 
 # Configuração do banco de dados (PostgreSQL)
 app.config['SQLALCHEMY_DATABASE_URI'] = get_database_url()
@@ -40,6 +42,10 @@ with app.app_context():
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve(path):
+    # Se for uma rota admin, não servir arquivos estáticos
+    if path.startswith('admin'):
+        return "Not Found", 404
+        
     static_folder_path = app.static_folder
     if static_folder_path is None:
             return "Static folder not configured", 404

@@ -3,8 +3,7 @@ import { Button } from '@/components/ui/button.jsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Textarea } from '@/components/ui/textarea.jsx'
 import { Input } from '@/components/ui/input.jsx'
-import { Star, CheckCircle, MessageCircle, Settings, ShoppingCart, RotateCcw, Headphones, HelpCircle } from 'lucide-react'
-import AdminDashboard from './components/AdminDashboard.jsx'
+import { Star, CheckCircle, MessageCircle, ShoppingCart, RotateCcw, Headphones, HelpCircle } from 'lucide-react'
 import './App.css'
 
 function App() {
@@ -15,10 +14,6 @@ function App() {
   const [comment, setComment] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [showAdmin, setShowAdmin] = useState(false)
-
-  // Verificar se está na rota admin
-  const isAdminRoute = window.location.pathname === '/admin' || window.location.hash === '#admin'
 
   const contextOptions = [
     { value: 'compra', label: 'Compra', icon: ShoppingCart },
@@ -86,13 +81,13 @@ function App() {
 
       if (response.ok) {
         setSubmitted(true)
-        setIsSubmitting(false) // CORREÇÃO: Resetar estado de submissão
+        setIsSubmitting(false)
       } else {
         throw new Error('Erro ao enviar avaliação')
       }
     } catch (error) {
       console.error('Erro:', error)
-      setIsSubmitting(false) // CORREÇÃO: Resetar estado em caso de erro
+      setIsSubmitting(false)
       alert('Erro ao enviar avaliação. Tente novamente.')
     }
   }
@@ -106,11 +101,6 @@ function App() {
       case 5: return 'Muito Satisfeito'
       default: return 'Selecione uma avaliação'
     }
-  }
-//cloves
-  // Mostrar dashboard admin se estiver na rota admin ou se showAdmin for true
- // if (isAdminRoute || showAdmin) {
-//    return <AdminDashboard />
   }
 
   if (submitted) {
@@ -131,7 +121,7 @@ function App() {
                   setContext('')
                   setOtherContext('')
                   setComment('')
-                  setIsSubmitting(false) // CORREÇÃO: Resetar estado de submissão
+                  setIsSubmitting(false)
                 }}
                 className="w-full"
               >
@@ -266,7 +256,6 @@ function App() {
               {isSubmitting ? 'Enviando...' : 'Enviar Avaliação'}
             </Button>
           </form>
-
         </CardContent>
       </Card>
     </div>
