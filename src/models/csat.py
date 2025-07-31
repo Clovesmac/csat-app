@@ -24,11 +24,18 @@ class CSATResponse(db.Model):
 
 # Configuração para usar PostgreSQL ou SQLite como fallback
 def get_database_url():
-    # Tentar usar PostgreSQL se disponível
+    # Usar PostgreSQL do Render.com
     postgres_url = os.environ.get('DATABASE_URL')
     if postgres_url:
         return postgres_url
     
-    # Fallback para SQLite local (para desenvolvimento)
-    return f"sqlite:///{os.path.join(os.path.dirname(__file__), '..', 'database', 'app.db')}"
+    # URL padrão do PostgreSQL do Render.com (para produção)
+    render_postgres_url = "postgresql://csat_user:hkdsCJ9zEjXO0TjdMivgwmdEr0e6SUZb@dpg-d25m5rndiees73c2faqg-a.singapore-postgres.render.com/csat_db"
+    
+    # Verificar se estamos em produção (Render.com)
+    if os.environ.get('RENDER'):
+        return render_postgres_url
+    
+    # Para desenvolvimento local, usar a URL do Render também
+    return render_postgres_url
 

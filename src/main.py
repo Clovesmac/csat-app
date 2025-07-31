@@ -3,10 +3,10 @@ import sys
 # DON'T CHANGE THIS !!!
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from flask import Flask, send_from_directory, jsonify
+from flask import Flask, send_from_directory
 from flask_cors import CORS
-from src.routes.csat_persistent import csat_bp
-from src.storage_manager import storage_manager
+from src.models.csat import db, CSATResponse, get_database_url
+from src.routes.csat import csat_bp
 
 app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
 app.config['SECRET_KEY'] = 'asdf#FGSgvasgf$5$WGT'
@@ -16,6 +16,26 @@ CORS(app)
 
 # Registrar blueprints
 app.register_blueprint(csat_bp, url_prefix='/api')
+
+# Configuração do banco de dados (PostgreSQL)
+app.config['SQLALCHEMY_DATABASE_URI'] = get_database_url()
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Configurações específicas para PostgreSQL
+if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgresql'):
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_pre_ping': True,
+        'pool_recycle': 300,
+    }
+
+db.init_app(app)
+
+with app.app_context():
+    try:
+        db.create_all()
+        print(f"Banco de dados inicializado: {app.config['SQLALCHEMY_DATABASE_URI']}")
+    except Exception as e:
+        print(f"Erro ao inicializar banco de dados: {e}")
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
@@ -37,44 +57,12 @@ def serve(path):
 def health_check():
     """Endpoint para verificar saúde da aplicação"""
     try:
-        storage_info = storage_manager.get_storage_info()
-        stats = storage_manager.get_stats()
-        
-        return {
-            'status': 'healthy',
-            'storage': storage_info,
-            'stats': stats,
-            'message': 'Aplicação funcionando com armazenamento persistente'
-        }, 200
+        # Testar conexão com banco
+        db.session.execute(db.text('SELECT 1'))
+        return {'status': 'healthy', 'database': 'connected'}, 200
     except Exception as e:
         return {'status': 'unhealthy', 'error': str(e)}, 500
 
-@app.route('/api/system-info')
-def system_info():
-    """Informações do sistema e armazenamento"""
-    try:
-        storage_info = storage_manager.get_storage_info()
-        stats = storage_manager.get_stats()
-        
-        return jsonify({
-            'system': {
-                'python_version': sys.version,
-                'flask_version': '2.3.3',
-                'storage_type': 'Persistent JSON File Storage'
-            },
-            'storage': storage_info,
-            'stats': stats
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 if __name__ == '__main__':
-    print("=== CSAT Application with Persistent Storage ===")
-    print(f"Storage location: {storage_manager.storage_dir}")
-    
-    # Verificar se há dados existentes
-    stats = storage_manager.get_stats()
-    print(f"Dados existentes: {stats['total']} registros")
-    
     app.run(host='0.0.0.0', port=5000, debug=True)
 

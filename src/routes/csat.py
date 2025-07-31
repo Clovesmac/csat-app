@@ -1,6 +1,8 @@
 from flask import Blueprint, request, jsonify, make_response
-from src.storage_manager import storage_manager
+from src.models.csat import db, CSATResponse
 from datetime import datetime
+import csv
+import io
 
 csat_bp = Blueprint('csat', __name__)
 
@@ -18,20 +20,25 @@ def create_csat_response():
         if not isinstance(rating, int) or rating < 1 or rating > 5:
             return jsonify({'error': 'Rating deve ser um número entre 1 e 5'}), 400
         
-        # Salvar usando o gerenciador de armazenamento persistente
-        response_id = storage_manager.add_response(
+        # Criar nova resposta CSAT
+        new_response = CSATResponse(
             rating=rating,
             context=data.get('context', ''),
             comment=data.get('comment', '')
         )
         
+        # Salvar no banco de dados
+        db.session.add(new_response)
+        db.session.commit()
+        
         return jsonify({
             'message': 'Avaliação salva com sucesso',
-            'id': response_id,
-            'storage_info': storage_manager.get_storage_info()
+            'id': new_response.id,
+            'data': new_response.to_dict()
         }), 201
         
     except Exception as e:
+        db.session.rollback()
         print(f"Erro ao salvar avaliação: {e}")
         return jsonify({'error': 'Erro interno do servidor'}), 500
 
@@ -39,8 +46,8 @@ def create_csat_response():
 def get_csat_responses():
     """Obter todas as respostas CSAT"""
     try:
-        responses = storage_manager.get_all_responses()
-        return jsonify(responses)
+        responses = CSATResponse.query.order_by(CSATResponse.timestamp.desc()).all()
+        return jsonify([response.to_dict() for response in responses])
     except Exception as e:
         print(f"Erro ao buscar avaliações: {e}")
         return jsonify({'error': 'Erro interno do servidor'}), 500
@@ -49,8 +56,37 @@ def get_csat_responses():
 def get_csat_stats():
     """Obter estatísticas das respostas CSAT"""
     try:
-        stats = storage_manager.get_stats()
-        return jsonify(stats)
+        responses = CSATResponse.query.all()
+        
+        if not responses:
+            return jsonify({
+                'total': 0,
+                'average': 0,
+                'distribution': {1: 0, 2: 0, 3: 0, 4: 0, 5: 0},
+                'context_distribution': {}
+            })
+        
+        total = len(responses)
+        ratings = [r.rating for r in responses]
+        average = sum(ratings) / total
+        
+        # Distribuição por rating
+        distribution = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        for rating in ratings:
+            distribution[rating] += 1
+        
+        # Distribuição por contexto
+        context_distribution = {}
+        for response in responses:
+            context = response.context or 'Não especificado'
+            context_distribution[context] = context_distribution.get(context, 0) + 1
+        
+        return jsonify({
+            'total': total,
+            'average': round(average, 2),
+            'distribution': distribution,
+            'context_distribution': context_distribution
+        })
     except Exception as e:
         print(f"Erro ao calcular estatísticas: {e}")
         return jsonify({'error': 'Erro interno do servidor'}), 500
@@ -59,7 +95,38 @@ def get_csat_stats():
 def export_csat_to_csv():
     """Exportar todas as avaliações CSAT para CSV"""
     try:
-        csv_data = storage_manager.export_to_csv()
+        responses = CSATResponse.query.order_by(CSATResponse.timestamp.desc()).all()
+        
+        # Criar buffer de string para o CSV
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Escrever cabeçalho
+        writer.writerow(['ID', 'Contexto', 'Avaliação', 'Comentário', 'Data/Hora'])
+        
+        # Escrever dados
+        for response in responses:
+            formatted_date = response.timestamp.strftime('%d/%m/%Y %H:%M:%S') if response.timestamp else ''
+            
+            rating_text = {
+                1: '1 - Muito Insatisfeito',
+                2: '2 - Insatisfeito', 
+                3: '3 - Neutro',
+                4: '4 - Satisfeito',
+                5: '5 - Muito Satisfeito'
+            }.get(response.rating, str(response.rating))
+            
+            writer.writerow([
+                response.id,
+                response.context or 'Não especificado',
+                rating_text,
+                response.comment or '',
+                formatted_date
+            ])
+        
+        output.seek(0)
+        csv_data = output.getvalue()
+        output.close()
         
         response = make_response(csv_data)
         response.headers['Content-Type'] = 'text/csv; charset=utf-8'
@@ -71,43 +138,42 @@ def export_csat_to_csv():
         print(f"Erro ao exportar dados: {e}")
         return jsonify({'error': f'Erro ao exportar dados: {str(e)}'}), 500
 
-@csat_bp.route('/csat/storage-info', methods=['GET'])
-def get_storage_info():
-    """Obter informações sobre o armazenamento"""
-    try:
-        info = storage_manager.get_storage_info()
-        return jsonify(info)
-    except Exception as e:
-        print(f"Erro ao obter informações de armazenamento: {e}")
-        return jsonify({'error': 'Erro interno do servidor'}), 500
-
 @csat_bp.route('/csat/test-persistence', methods=['POST'])
 def test_persistence():
     """Testar persistência adicionando dados de teste"""
     try:
         # Adicionar alguns dados de teste
         test_data = [
-            {'rating': 5, 'context': 'Compra', 'comment': 'Teste de persistência - Excelente!'},
-            {'rating': 4, 'context': 'Suporte/Assistência', 'comment': 'Teste de persistência - Muito bom!'},
-            {'rating': 3, 'context': 'Devolução', 'comment': 'Teste de persistência - Regular'}
+            {'rating': 5, 'context': 'Compra', 'comment': 'Teste PostgreSQL - Excelente!'},
+            {'rating': 4, 'context': 'Suporte/Assistência', 'comment': 'Teste PostgreSQL - Muito bom!'},
+            {'rating': 3, 'context': 'Devolução', 'comment': 'Teste PostgreSQL - Regular'}
         ]
         
-        added_ids = []
+        added_responses = []
         for data in test_data:
-            response_id = storage_manager.add_response(**data)
-            added_ids.append(response_id)
+            new_response = CSATResponse(
+                rating=data['rating'],
+                context=data['context'],
+                comment=data['comment']
+            )
+            db.session.add(new_response)
+            db.session.flush()  # Para obter o ID
+            added_responses.append(new_response.to_dict())
         
-        storage_info = storage_manager.get_storage_info()
-        stats = storage_manager.get_stats()
+        db.session.commit()
+        
+        # Obter estatísticas atuais
+        total_responses = CSATResponse.query.count()
         
         return jsonify({
-            'message': 'Dados de teste adicionados com sucesso',
-            'added_ids': added_ids,
-            'storage_info': storage_info,
-            'current_stats': stats
+            'message': 'Dados de teste adicionados com sucesso no PostgreSQL',
+            'added_responses': added_responses,
+            'total_responses': total_responses,
+            'database': 'PostgreSQL'
         }), 201
         
     except Exception as e:
+        db.session.rollback()
         print(f"Erro no teste de persistência: {e}")
         return jsonify({'error': 'Erro interno do servidor'}), 500
 
