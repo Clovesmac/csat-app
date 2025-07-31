@@ -266,7 +266,7 @@ function App() {
               {isSubmitting ? 'Enviando...' : 'Enviar Avaliação'}
             </Button>
           </form>
-
+ {/* 
           {/* Link para Admin (discreto) */}
           <div className="mt-6 text-center">
             <button
@@ -276,7 +276,7 @@ function App() {
               <Settings className="w-3 h-3 inline mr-1" />
               Admin
             </button>
-          </div>
+          </div>  */} 
         </CardContent>
       </Card>
     </div>
