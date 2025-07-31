@@ -266,17 +266,7 @@ function App() {
               {isSubmitting ? 'Enviando...' : 'Enviar Avaliação'}
             </Button>
           </form>
- {/* 
-          {/* Link para Admin (discreto) */}
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => setShowAdmin(true)}
-              className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <Settings className="w-3 h-3 inline mr-1" />
-              Admin
-            </button>
-          </div>  */} 
+
         </CardContent>
       </Card>
     </div>
