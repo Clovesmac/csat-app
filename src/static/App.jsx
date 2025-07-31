@@ -107,10 +107,10 @@ function App() {
       default: return 'Selecione uma avaliação'
     }
   }
-
+//cloves
   // Mostrar dashboard admin se estiver na rota admin ou se showAdmin for true
-  if (isAdminRoute || showAdmin) {
-    return <AdminDashboard />
+ // if (isAdminRoute || showAdmin) {
+//    return <AdminDashboard />
   }
 
   if (submitted) {
